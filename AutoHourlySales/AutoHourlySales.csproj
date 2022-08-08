@@ -34,7 +34,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>\\TMDEV\SharedFolder\AutoHourly V2.9\bin\</OutputPath>
+    <OutputPath>C:\Users\ryan\Documents\TM Releases\AutoHourly V2.11\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -49,7 +49,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <ManifestCertificateThumbprint>38010CB7CDD76DFF80158D3EEBA03707FB08CB60</ManifestCertificateThumbprint>
+    <ManifestCertificateThumbprint>88252335BC6E66D0701B39B32F1904E313692EDB</ManifestCertificateThumbprint>
   </PropertyGroup>
   <PropertyGroup>
     <ManifestKeyFile>AutoHourlySales_TemporaryKey.pfx</ManifestKeyFile>
@@ -96,6 +96,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="AutoHourlySales_TemporaryKey.pfx" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

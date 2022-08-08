@@ -35,9 +35,9 @@ namespace AutoHourlySales
         static void Main(string[] args)
         {
 
-            Console.WriteLine("Program Starting...");
+            Log("Program Starting...");
 
-            Console.WriteLine(ConfigurationManager.AppSettings.Get("Store" ));
+            Log(ConfigurationManager.AppSettings.Get("Store" ));
 
 
             Log("Program triggered at time: " + date.ToString("HH:mm:ss") + ", hour = " + date.Hour);
@@ -53,7 +53,6 @@ namespace AutoHourlySales
             // If the program is configured to override BOTH date and hour
             if (dateOverride != "false") // dateOVerride must be a number
             {
-                Console.WriteLine("ALALALALALALALA");
                 date = new DateTime(Convert.ToInt32(dateOverride.Substring(0, 4)),
                                     Convert.ToInt32(dateOverride.Substring(5, 2)),
                                     Convert.ToInt32(dateOverride.Substring(8, 2)),
@@ -70,7 +69,7 @@ namespace AutoHourlySales
 
 
             // DSId Generation -------------------------------------------------------------------------------
-            Console.WriteLine("Is DSid generation needed? (Hour == 1)?..." + ((date.Hour == 1) ? "yes" : "no"));
+            Log("Is DSid generation needed? (Hour == 1)?..." + ((date.Hour == 1) ? "yes" : "no"));
             if (date.Hour == 1 || ConfigurationManager.AppSettings.Get("Override1am") == "true")
             {
                 try
@@ -87,7 +86,6 @@ namespace AutoHourlySales
 
 
 
-            Console.WriteLine("Global parameters: date=" + date + "; storeId=" + storeId);
             Log("Global parameters: date=" + date + "; storeId=" + storeId);
 
             /*
@@ -108,7 +106,6 @@ namespace AutoHourlySales
                     printDailySalesEntry(live);
                     if (sybase != live && sybase.HourlySales != 0)
                     {
-                        Console.WriteLine("Error discovered! ID: " + sybase.DailySalesId + ", hour: " + i);
                         Log("Error discovered! ID: " + sybase.DailySalesId + ", hour: " + i);
                         updateEntry(sybase);
                     }
@@ -150,21 +147,17 @@ namespace AutoHourlySales
                 Log("Connecting to Sybase");
                 connection = new OdbcConnection(sybase);
                 connection.Open();
-
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.StackTrace);
                 Log(e.Message);
                 Log(e.StackTrace);
                 DumpLog();
                 System.Environment.Exit(-1);
             }
 
-            Console.Out.WriteLine("---Connection state = " + (connection.State == ConnectionState.Open));
             Log("Connection state = " + (connection.State == ConnectionState.Open));
 
-            Console.Out.WriteLine(time1 + " -> " + time2);
             Log(time1 + " -> " + time2);
 
 
@@ -185,7 +178,7 @@ namespace AutoHourlySales
                     buffer = cmd.ExecuteScalar();
                     dailySalesEntry.CustCount = (buffer == null || buffer == DBNull.Value) ? 0 : (int)buffer;
                     Log("-->" + dailySalesEntry.CustCount);
-                    Console.Out.WriteLine("Customer Count = " + dailySalesEntry.CustCount);
+                    Log("Customer Count = " + dailySalesEntry.CustCount);
 
 
 
@@ -196,7 +189,7 @@ namespace AutoHourlySales
                     buffer = cmd.ExecuteScalar();
                     dailySalesEntry.DriveCustCount = (buffer == null || buffer == DBNull.Value) ? 0 : (int)buffer;
                     Log("-->" + dailySalesEntry.DriveCustCount);
-                    Console.Out.WriteLine("DriveCustCount = " + dailySalesEntry.DriveCustCount);
+                    Log("DriveCustCount = " + dailySalesEntry.DriveCustCount);
 
 
 
@@ -207,7 +200,7 @@ namespace AutoHourlySales
                     buffer = cmd.ExecuteScalar();
                     dailySalesEntry.HourlySales = (buffer == null || buffer == DBNull.Value) ? 0 : (double)buffer;
                     Log("-->" + dailySalesEntry.HourlySales);
-                    Console.Out.WriteLine("HourlySales = " + dailySalesEntry.HourlySales);
+                    Log("HourlySales = " + dailySalesEntry.HourlySales);
 
 
 
@@ -218,7 +211,7 @@ namespace AutoHourlySales
                     buffer = cmd.ExecuteScalar();
                     dailySalesEntry.CumulativeTotalSales = (buffer == null || buffer == DBNull.Value) ? 0 : (double)buffer;
                     Log("-->" + dailySalesEntry.CumulativeTotalSales);
-                    Console.Out.WriteLine("CumulativeTotalSales = " + dailySalesEntry.CumulativeTotalSales);
+                    Log("CumulativeTotalSales = " + dailySalesEntry.CumulativeTotalSales);
 
 
                 }
@@ -242,7 +235,6 @@ namespace AutoHourlySales
             else
             {
                 Log("Checking early morning sales");
-                Console.WriteLine("Early morning checking");
 
                 int custCount;
                 double hourlySales;
@@ -263,13 +255,13 @@ namespace AutoHourlySales
                 buffer = cmd.ExecuteScalar();
                 hourlySales = (buffer == null || buffer == DBNull.Value) ? 0 : (double)buffer;
                 Log("--> " + hourlySales);
-                Console.Out.WriteLine("Hourly Sales = " + hourlySales + " CustCount = " + custCount);
+                Log("Hourly Sales = " + hourlySales + " CustCount = " + custCount);
 
                 if (custCount > 0 || hourlySales > 0)
                 {
                     try
                     {
-                        Console.Out.WriteLine("Update necessary");
+                        Log("Update necessary");
                         DateTime dayBefore = date.AddDays(-1);
 
                         dailySalesEntry = new DailySalesEntry();
@@ -282,7 +274,7 @@ namespace AutoHourlySales
                         Log("DailySalesId for yesterday (" + dayBefore.ToString("yyyy-MM-dd") + ") : " + dailySalesEntry.DailySalesId);
 
 
-                        Console.Out.WriteLine(time1 + " -> " + time2);
+                        Log(time1 + " -> " + time2);
 
                         paramText = "select count(numcust) from posheader where numcust > 0 and nettotal > 0 and status = 3 and timeend between '" +
                                             dayString + " " + time1 + "' and '" + dayString + " " + time2 + "' group by numcust";
@@ -291,7 +283,7 @@ namespace AutoHourlySales
                         Log("CustCount, Executing '" + paramText + "'");
                         buffer = cmd.ExecuteScalar();
                         dailySalesEntry.CustCount = (buffer == null || buffer == DBNull.Value) ? 0 : (int)buffer;
-                        Console.Out.WriteLine("CustCount = " + dailySalesEntry.CustCount);
+                        Log("CustCount = " + dailySalesEntry.CustCount);
                         Log("-->" + dailySalesEntry.CustCount);
 
 
@@ -302,7 +294,7 @@ namespace AutoHourlySales
                         Log("DriveCustCount, Executing '" + paramText + "'");
                         buffer = cmd.ExecuteScalar();
                         dailySalesEntry.DriveCustCount = (buffer == null || buffer == DBNull.Value) ? 0 : (int)buffer;
-                        Console.Out.WriteLine("DriveCustCount = " + dailySalesEntry.DriveCustCount);
+                        Log("DriveCustCount = " + dailySalesEntry.DriveCustCount);
                         Log("-->" + dailySalesEntry.DriveCustCount);
 
 
@@ -314,7 +306,7 @@ namespace AutoHourlySales
                         Log("HourlySales, Executing '" + paramText + "'");
                         buffer = cmd.ExecuteScalar();
                         dailySalesEntry.HourlySales = (buffer == null || buffer == DBNull.Value) ? 0 : (double)buffer;
-                        Console.Out.WriteLine("HourlySales = " + dailySalesEntry.HourlySales);
+                        Log("HourlySales = " + dailySalesEntry.HourlySales);
                         Log("-->" + dailySalesEntry.HourlySales);
 
 
@@ -326,7 +318,7 @@ namespace AutoHourlySales
                         Log("CumulativeSales, Executing '" + paramText + "'");
                         buffer = cmd.ExecuteScalar();
                         dailySalesEntry.CumulativeTotalSales = (buffer == null || buffer == DBNull.Value) ? 0 : (double)buffer;
-                        Console.Out.WriteLine("CumulutativeTotalSales = " + dailySalesEntry.CumulativeTotalSales);
+                        Log("CumulutativeTotalSales = " + dailySalesEntry.CumulativeTotalSales);
                         Log("-->" + dailySalesEntry.CumulativeTotalSales);
 
 
@@ -358,7 +350,6 @@ namespace AutoHourlySales
                 else
                 {
                     Log("No update needed");
-                    Console.Out.WriteLine("No update Needed");
                 }
                 connection.Close();
             }
@@ -378,25 +369,25 @@ namespace AutoHourlySales
                 Log("Executing cust count from live");
                 buffer = connection.ExecuteScalar("Select CustCount from dailysalesentry where dailysalesid = " + dailySalesID + " and hour = " + hour);
                 dailySalesEntry.CustCount = (buffer == null || buffer == DBNull.Value) ? 0 : (int)buffer;
-                Console.WriteLine("CustCount = " + dailySalesEntry.CustCount);
+                Log("CustCount = " + dailySalesEntry.CustCount);
                 Log("-->" + dailySalesEntry.CustCount);
 
                 Log("Executing drive cust count from live");
                 buffer = connection.ExecuteScalar("Select drivecustcount from dailysalesentry where dailysalesid = " + dailySalesID + " and hour = " + hour);
                 dailySalesEntry.DriveCustCount = (buffer == null || buffer == DBNull.Value) ? 0 : (int)buffer;
-                Console.Out.WriteLine("DriveCustCount = " + dailySalesEntry.DriveCustCount);
+                Log("DriveCustCount = " + dailySalesEntry.DriveCustCount);
                 Log("-->" + dailySalesEntry.DriveCustCount);
 
                 Log("Executing hourly sales from live");
                 buffer = connection.ExecuteScalar("Select hourlysales from dailysalesentry where dailysalesid = " + dailySalesID + " and hour = " + hour);
                 dailySalesEntry.HourlySales = (buffer == null || buffer == DBNull.Value) ? 0 : Convert.ToDouble(buffer);
-                Console.Out.WriteLine("hourlysales = " + dailySalesEntry.HourlySales);
+                Log("hourlysales = " + dailySalesEntry.HourlySales);
                 Log("-->" + dailySalesEntry.HourlySales); 
                 
                 Log("Executing cumulative sales from live");
                 buffer = connection.ExecuteScalar("Select cumulativetotalsales from dailysalesentry where dailysalesid = " + dailySalesID + " and hour = " + hour);
                 dailySalesEntry.CumulativeTotalSales = (buffer == null || buffer == DBNull.Value) ? 0 : Convert.ToDouble(buffer);
-                Console.Out.WriteLine("CustCount = " + dailySalesEntry.CumulativeTotalSales);
+                Log("CustCount = " + dailySalesEntry.CumulativeTotalSales);
                 Log("-->" + dailySalesEntry.CumulativeTotalSales);
 
                 dailySalesEntry.Hour = hour;
@@ -405,7 +396,6 @@ namespace AutoHourlySales
 
             }
             catch (Exception e) { 
-                Console.WriteLine(e.StackTrace);
                 Log(e.Message);
                 Log(e.StackTrace);
             }
@@ -422,47 +412,35 @@ namespace AutoHourlySales
                 IDbConnection connection = new System.Data.SqlClient.SqlConnection(target);
                 connection.Open();
 
-                Console.Out.WriteLine("Portal Connection state = " + (connection.State == ConnectionState.Open));
                 Log("Portal Connection successful = " + (connection.State == ConnectionState.Open));
 
                 Log("Executing 'dbo.updateDailySalesEntry " + dailySalesEntry.DailySalesId + " " + dailySalesEntry.Hour + " " + dailySalesEntry.Manager + " " + dailySalesEntry.CustCount + " " + dailySalesEntry.DriveCustCount + " " + dailySalesEntry.HourlySales + " " + dailySalesEntry.CumulativeTotalSales + "'");
                 connection.Execute("dbo.updateDailySalesEntry @DailySalesId, @Hour, @CustCount, @DriveCustCount, @HourlySales, @CumulativeTotalSales", dailySalesEntry);
-                Console.Out.WriteLine("Entry added!");
                 Log("Entry added");
                 connection.Close();
 
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.Message);
-                Console.WriteLine(e.StackTrace);
                 Log(e.Message);
                 Log(e.StackTrace);
             }
         }
         public static void printDailySalesEntry(DailySalesEntry dailySalesEntry)
         {
-            Console.Out.WriteLine("DailySalesId | Hour | CustCount | DriveCustCount | HourlySales | Cuml.Sales");
-            Console.Out.Write(Convert.ToString(dailySalesEntry.DailySalesId).PadRight(15));
-            Console.Out.Write(Convert.ToString(dailySalesEntry.Hour).PadRight(7));
-            Console.Out.Write(Convert.ToString(dailySalesEntry.CustCount).PadRight(12));
-            Console.Out.Write(Convert.ToString(dailySalesEntry.DriveCustCount).PadRight(17));
-            Console.Out.Write(Convert.ToString(dailySalesEntry.HourlySales).PadRight(14));
-            Console.Out.Write(Convert.ToString(dailySalesEntry.CumulativeTotalSales) + "\n");
-            
-
-
+            Log("DailySalesId | Hour | CustCount | DriveCustCount | HourlySales | Cuml.Sales");
+            Log(Convert.ToString(dailySalesEntry.DailySalesId).PadRight(15) + Convert.ToString(dailySalesEntry.Hour).PadRight(7) 
+               + Convert.ToString(dailySalesEntry.CustCount).PadRight(12) + Convert.ToString(dailySalesEntry.DriveCustCount).PadRight(17) 
+               + Convert.ToString(dailySalesEntry.HourlySales).PadRight(14) + Convert.ToString(dailySalesEntry.CumulativeTotalSales) + "\n");
         }
         public static void Generate24Entries(int storeId, string store)
         {
-            Console.WriteLine("Generate 24 Entries started...");
             Log("24 entry generation triggered");
 
             using (IDbConnection connection = new System.Data.SqlClient.SqlConnection(target))
             {
                 Log("Connecting to target to check for DailySalesId");
                 connection.Open();
-                Console.Out.WriteLine("---Connection state = " + (connection.State == ConnectionState.Open));
                 Log("---Connection success = " + (connection.State == ConnectionState.Open));
 
                 int DSid = getDailySalesId(new DateTime(date.Year, date.Month, date.Day), storeId, store);
@@ -471,7 +449,9 @@ namespace AutoHourlySales
                 int fiscalYear = (date.Month == 12) ? date.Year + 1 : date.Year;
                 TimeSpan tDiff = new DateTime(fiscalYear - 1, 12, 1) - date;
                 int week = Math.Abs(tDiff.Days / 7) + 1;
-                object buffer = connection.ExecuteScalar("select ID from projections where FiscalYear = " + fiscalYear + " and week = " + week + " and storeid = " + storeId);
+                string cmdText = "select ID from projections where FiscalYear = " + fiscalYear + " and week = " + week + " and storeid = " + storeId;
+                object buffer = connection.ExecuteScalar(cmdText);
+                Log("Projection ID: " + cmdText);
                 if (buffer != DBNull.Value && buffer != null && Convert.ToInt32(buffer) != 0)
                 {
                     projectionID = Convert.ToInt32(buffer);
@@ -507,7 +487,7 @@ namespace AutoHourlySales
                         dayOfWeek = 0;
                         break;
                 }
-                Console.WriteLine("---Generating 24 entries for DailySalesId = " + DSid);
+                Log("---Generating 24 entries for DailySalesId = " + DSid);
                 for (int i = 1; i <= 24; i++)
                 {
                     DailySalesEntry dse = new DailySalesEntry();
@@ -515,11 +495,12 @@ namespace AutoHourlySales
                     if (i >= 9)
                     {
 
+                        Log("Generating Budgeted Man Hours for hour " + i);
                         string paramText = "select Day" + dayOfWeek + " from projectionsideal where projectionsID = " + projectionID + " and hour = " + (i - 8);
                         buffer = connection.ExecuteScalar(paramText);
+                        Log("Budgeted hours command: " + paramText);
                         if (buffer != DBNull.Value && buffer != null && Convert.ToDouble(buffer) != 0)
                         {
-                            Console.WriteLine("BudgetedManHours = " + Convert.ToDouble(buffer));
                             Log("BudgetedManHours = " + Convert.ToDouble(buffer));
                             dse.BudgetedManHours = Convert.ToDouble(buffer);
                         }
@@ -545,13 +526,11 @@ namespace AutoHourlySales
                 }
                 connection.Close();
             }
-     
-        Log("Generating 24 Entries complete.");
-        Console.WriteLine("Generate 24 Entries complete");
+            Log("Generating 24 Entries complete.");
         }
         public static void DSIdGenerator(int storeId, string store, DateTime date)
         {
-            Console.Out.WriteLine("Generating DSId starting...");
+            Log("Generating DSId starting...");
             Log("Hour = " + DateTime.Now.Hour + ", DailysSalesId checking triggered");
 
             Log("Date = " + date.ToString("yyyy-MM-dd"));
@@ -563,21 +542,20 @@ namespace AutoHourlySales
                     Log("Connecting to target to check for DailySalesId");
 
                     connection.Open();
-                    Console.Out.WriteLine("---Connection state = " + (connection.State == ConnectionState.Open));
                     Log("---Connection success = " + (connection.State == ConnectionState.Open));
 
                     /*
                     * Step 1: Check if entry already exists for date
                     */
-                    Console.Out.WriteLine("---Checking if ID exists for " + date);
+                    Log("---Checking if ID exists for " + date);
 
                     Log("Executing 'dbo.getDailySalesId " + date.ToString("yyyy-MM-dd") + " " + storeId + "'");
                     object buffer = connection.Query<int>("dbo.getDailySalesId @Date, @StoreId", new { Date = date, StoreId = storeId }).FirstOrDefault();
                     if (buffer != null && buffer != DBNull.Value && (int)buffer != 0)
                     {
-                        Console.WriteLine("---ID already exists for date, ID = " + (int)buffer);
+                        Log("---ID already exists for date, ID = " + (int)buffer);
                         Log("--> " + (int)buffer);
-                        Console.WriteLine("Generating DSid complete");
+                        Log("Generating DSid complete");
                     }
 
 
@@ -587,21 +565,22 @@ namespace AutoHourlySales
                     else
                     {
                         Log("--> null");
-                        Console.WriteLine("---Previous ID not found, creating new ID");
-                        DailySales dailySales = new DailySales(date);
+                        Log("---Previous ID not found, creating new ID");
+                        var _date = new DateTime(date.Year, date.Month, date.Day, 0, 0, 0);
+                        DailySales dailySales = new DailySales(_date);
                         dailySales.ManagerId = 0;
                         dailySales.Manager = "";
 
                         Log("Creating new DailySalesId");
-                        Console.WriteLine("DailySalesDate    | StoreId | Store | BaseForDay | ProjectionForDay | SubmitDate");
-                        Console.WriteLine(dailySales.DailySalesDate + " " + dailySales.StoreId + " " + dailySales.Store +
+                        Log("DailySalesDate    | StoreId | Store | BaseForDay | ProjectionForDay | SubmitDate");
+                        Log(dailySales.DailySalesDate + " " + dailySales.StoreId + " " + dailySales.Store +
                                             " " + dailySales.BaseForDay + " " + dailySales.ProjectionForDay + " " + dailySales.SubmitDate);
 
                         Log("Executing 'dbo.addDailySales " + dailySales.DailySalesDate + " " + dailySales.StoreId + " " + dailySales.Store + " " + dailySales.ManagerId + " " + dailySales.Manager + " "
                                + dailySales.BaseForDay + " " + dailySales.ProjectionForDay + " " + dailySales.SubmitDate);
                         connection.Execute("dbo.addDailySales @DailySalesDate, @StoreId, @Store, @ManagerId, @Manager, @BaseForDay, @ProjectionForDay, @SubmitDate", dailySales);
 
-                        Console.WriteLine("Generating DSid complete");
+                        Log("Generating DSid complete");
                         Log("DailySalesId Generated");
 
                         //Check to make sure the day is clear before calling 24 hour generator
@@ -631,33 +610,34 @@ namespace AutoHourlySales
              * Step 1: Find the DailySalesId assigned to todays date
              */
             Log("Fetching DailySalesId");
-            Console.WriteLine("Getting DailySaleId for date = " + date + " { ");
+            Log("Getting DailySaleId for date = " + date + " { ");
             int DailySalesId = 0;
-            Console.WriteLine("Establishing connection to: " + target);
+            Log("Establishing connection to: " + target);
             using (IDbConnection connection = new System.Data.SqlClient.SqlConnection(target))
             {
                 Log("Connecting to target to check for DailySalesId");
 
                 connection.Open();
-                Console.Out.WriteLine("---Connection state = " + (connection.State == ConnectionState.Open));
+                Log("---Connection state = " + (connection.State == ConnectionState.Open));
                 Log("---Connection success = " + (connection.State == ConnectionState.Open));
 
 
                 DateTime queryDate = new DateTime(date.Year, date.Month, date.Day);
                                 
                 DailySalesId = connection.Query<int>("dbo.getDailySalesId @DailySalesDate, @StoreId", new { DailySalesDate = queryDate, StoreId = StoreId, Store = Store}).FirstOrDefault();
-                Console.Out.WriteLine("---Fetched ID = " + DailySalesId);
+                Log("---Fetched ID = " + DailySalesId);
 
                 connection.Close();
             }
 
-            Console.WriteLine("Getting DailySaleId for date = " + date + " complete");
+            Log("Getting DailySaleId for date = " + date + " complete");
 
             return DailySalesId;
         }
      
         public static void Log(string s)
         {
+            Console.WriteLine(s);
             logArray.Add(DateTime.Now.ToString("HH:mm:ss") + " : " + s);
         }
         public static void DumpLog()

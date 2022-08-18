@@ -463,25 +463,25 @@ namespace AutoHourlySales
                 switch (dow.ToString())
                 {
                     case "Tuesday":
-                        dayOfWeek = 3;
-                        break;
-                    case "Wednesday":
-                        dayOfWeek = 4;
-                        break;
-                    case "Thursday":
-                        dayOfWeek = 5;
-                        break;
-                    case "Friday":
-                        dayOfWeek = 6;
-                        break;
-                    case "Saturday":
                         dayOfWeek = 7;
                         break;
-                    case "Sunday":
+                    case "Wednesday":
                         dayOfWeek = 1;
                         break;
-                    case "Monday":
+                    case "Thursday":
                         dayOfWeek = 2;
+                        break;
+                    case "Friday":
+                        dayOfWeek = 3;
+                        break;
+                    case "Saturday":
+                        dayOfWeek = 4;
+                        break;
+                    case "Sunday":
+                        dayOfWeek = 5;
+                        break;
+                    case "Monday":
+                        dayOfWeek = 6;
                         break;
                     default:
                         dayOfWeek = 0;

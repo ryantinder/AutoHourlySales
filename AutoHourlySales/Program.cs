@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Data;
 using System.Data.Odbc;
-using Dapper;
 using System.Configuration;
 using System.IO;
+using Dapper;
 
 
 
@@ -66,15 +66,22 @@ namespace AutoHourlySales
                 date = new DateTime(date.Year, date.Month, date.Day, Convert.ToInt32(hourOverride), 0, 0);
             }
             // End of date configuration ---------------------------------------------------------------------
-
-
+            Console.WriteLine("Attempting to connect to DB");
+            IDbConnection connection = new System.Data.SqlClient.SqlConnection(target);
+            try
+            {
+                connection.Open();
+            } catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
             // DSId Generation -------------------------------------------------------------------------------
             Log("Is DSid generation needed? (Hour == 1)?..." + ((date.Hour == 1) ? "yes" : "no"));
             if (date.Hour == 1 || ConfigurationManager.AppSettings.Get("Override1am") == "true")
             {
                 try
                 {
-                    DSIdGenerator(storeId, store, date);
+                    DSIdGenerator(connection, storeId, store, date);
                 }
                 catch (Exception e)
                 {
@@ -92,26 +99,27 @@ namespace AutoHourlySales
                 * Step 2: Using the current system hour, grab that stats and fit into packet
                 * 
                 */
-            
-            DailySalesEntry realtime = fetchStatsFromSybase(date, storeId, store);
-            updateEntry(realtime);
+
+            DailySalesEntry realtime = fetchStatsFromSybase(connection, date, storeId, store);
+            updateEntry(connection, realtime);
 
             if (ConfigurationManager.AppSettings.Get("disableReconcilliation") == "false")
             {
                 for (int i = 1; i <= date.Hour; i++)
                 {
-                    DailySalesEntry sybase = fetchStatsFromSybase(new DateTime(date.Year, date.Month, date.Day, i, 0, 0), storeId, store);
-                    DailySalesEntry live = fetchStatsFromLive(sybase.DailySalesId, i);
+                    DailySalesEntry sybase = fetchStatsFromSybase(connection, new DateTime(date.Year, date.Month, date.Day, i, 0, 0), storeId, store);
+                    DailySalesEntry live = fetchStatsFromLive(connection, sybase.DailySalesId, i);
                     printDailySalesEntry(sybase);
                     printDailySalesEntry(live);
                     if (sybase != live && sybase.HourlySales != 0)
                     {
                         Log("Error discovered! ID: " + sybase.DailySalesId + ", hour: " + i);
-                        updateEntry(sybase);
+                        updateEntry(connection, sybase);
                     }
                 }
             }
-            
+            connection.Close();
+            Log("Connection closed");
             Log("Program Ending");
             DumpLog();
             if (ConfigurationManager.AppSettings.Get("consoleReadkey()") == "true")
@@ -119,10 +127,10 @@ namespace AutoHourlySales
                 Console.ReadKey();
             }
         }
-        public static DailySalesEntry fetchStatsFromSybase(DateTime date, int storeId, string store)
+        public static DailySalesEntry fetchStatsFromSybase(IDbConnection liveDB, DateTime date, int storeId, string store)
         {
             DailySalesEntry dailySalesEntry = new DailySalesEntry();
-            dailySalesEntry.DailySalesId = Program.getDailySalesId(date, storeId, store);
+            dailySalesEntry.DailySalesId = Program.getDailySalesId(liveDB, date, storeId, store);
             dailySalesEntry.Hour = date.Hour;
 
             string dayString = date.ToString("yyyy-MM-dd");
@@ -137,7 +145,7 @@ namespace AutoHourlySales
                 dayString = date.AddDays(-1).ToString("yyyy-MM-dd");
                 time1 = "23:00:00.000";
                 time2 = "23:59:59.999";
-                dailySalesEntry.DailySalesId = Program.getDailySalesId(date.AddDays(-1), storeId, store);
+                dailySalesEntry.DailySalesId = Program.getDailySalesId(liveDB, date.AddDays(-1), storeId, store);
                 dailySalesEntry.Hour = 24;
             }
 
@@ -269,7 +277,7 @@ namespace AutoHourlySales
                         dailySalesEntry.DriveCustCount = 0;
                         dailySalesEntry.HourlySales = 0;
                         dailySalesEntry.CumulativeTotalSales = 0;
-                        dailySalesEntry.DailySalesId = Program.getDailySalesId(dayBefore, storeId, store);
+                        dailySalesEntry.DailySalesId = Program.getDailySalesId(liveDB, dayBefore, storeId, store);
                         dailySalesEntry.Hour = date.Hour;
                         Log("DailySalesId for yesterday (" + dayBefore.ToString("yyyy-MM-dd") + ") : " + dailySalesEntry.DailySalesId);
 
@@ -356,16 +364,12 @@ namespace AutoHourlySales
 
             return dailySalesEntry;
         }
-        public static DailySalesEntry fetchStatsFromLive(int dailySalesID, int hour)
+        public static DailySalesEntry fetchStatsFromLive(IDbConnection connection, int dailySalesID, int hour)
         {
             DailySalesEntry dailySalesEntry = new DailySalesEntry();
             object buffer;
             try
             {
-                IDbConnection connection = new System.Data.SqlClient.SqlConnection(target);
-                connection.Open();
-
-
                 Log("Executing cust count from live");
                 buffer = connection.ExecuteScalar("Select CustCount from dailysalesentry where dailysalesid = " + dailySalesID + " and hour = " + hour);
                 dailySalesEntry.CustCount = (buffer == null || buffer == DBNull.Value) ? 0 : (int)buffer;
@@ -403,21 +407,18 @@ namespace AutoHourlySales
 
             return dailySalesEntry;
         }
-        public static void updateEntry(DailySalesEntry dailySalesEntry)
+        public static void updateEntry(IDbConnection connection, DailySalesEntry dailySalesEntry)
         {
             
             try
             {
                 Log("Connecting to target portal");
-                IDbConnection connection = new System.Data.SqlClient.SqlConnection(target);
-                connection.Open();
 
                 Log("Portal Connection successful = " + (connection.State == ConnectionState.Open));
 
                 Log("Executing 'dbo.updateDailySalesEntry " + dailySalesEntry.DailySalesId + " " + dailySalesEntry.Hour + " " + dailySalesEntry.Manager + " " + dailySalesEntry.CustCount + " " + dailySalesEntry.DriveCustCount + " " + dailySalesEntry.HourlySales + " " + dailySalesEntry.CumulativeTotalSales + "'");
                 connection.Execute("dbo.updateDailySalesEntry @DailySalesId, @Hour, @CustCount, @DriveCustCount, @HourlySales, @CumulativeTotalSales", dailySalesEntry);
                 Log("Entry added");
-                connection.Close();
 
             }
             catch (Exception e)
@@ -433,102 +434,76 @@ namespace AutoHourlySales
                + Convert.ToString(dailySalesEntry.CustCount).PadRight(12) + Convert.ToString(dailySalesEntry.DriveCustCount).PadRight(17) 
                + Convert.ToString(dailySalesEntry.HourlySales).PadRight(14) + Convert.ToString(dailySalesEntry.CumulativeTotalSales) + "\n");
         }
-        public static void Generate24Entries(int storeId, string store)
+        public static void Generate24Entries(IDbConnection connection, int storeId, string store)
         {
             Log("24 entry generation triggered");
 
-            using (IDbConnection connection = new System.Data.SqlClient.SqlConnection(target))
+            Log("---Connection success = " + (connection.State == ConnectionState.Open));
+
+            int DSid = getDailySalesId(connection, new DateTime(date.Year, date.Month, date.Day), storeId, store);
+
+            int projectionID = 0;
+            int fiscalYear = (date.Month == 12) ? date.Year + 1 : date.Year;
+            TimeSpan tDiff = new DateTime(fiscalYear - 1, 12, 1) - date;
+            int week = Math.Abs(tDiff.Days / 7) + 1;
+            string cmdText = "select ID from projections where FiscalYear = " + fiscalYear + " and week = " + week + " and storeid = " + storeId;
+            object buffer = connection.ExecuteScalar(cmdText);
+            Log("Projection ID: " + cmdText);
+            if (buffer != DBNull.Value && buffer != null && Convert.ToInt32(buffer) != 0)
             {
-                Log("Connecting to target to check for DailySalesId");
-                connection.Open();
-                Log("---Connection success = " + (connection.State == ConnectionState.Open));
-
-                int DSid = getDailySalesId(new DateTime(date.Year, date.Month, date.Day), storeId, store);
-
-                int projectionID = 0;
-                int fiscalYear = (date.Month == 12) ? date.Year + 1 : date.Year;
-                TimeSpan tDiff = new DateTime(fiscalYear - 1, 12, 1) - date;
-                int week = Math.Abs(tDiff.Days / 7) + 1;
-                string cmdText = "select ID from projections where FiscalYear = " + fiscalYear + " and week = " + week + " and storeid = " + storeId;
-                object buffer = connection.ExecuteScalar(cmdText);
-                Log("Projection ID: " + cmdText);
-                if (buffer != DBNull.Value && buffer != null && Convert.ToInt32(buffer) != 0)
-                {
-                    projectionID = Convert.ToInt32(buffer);
-                }
-
-                int dayOfWeek = 0;
-                DayOfWeek dow = date.DayOfWeek;
-
-                switch (dow.ToString())
-                {
-                    case "Tuesday":
-                        dayOfWeek = 6;
-                        break;
-                    case "Wednesday":
-                        dayOfWeek = 7;
-                        break;
-                    case "Thursday":
-                        dayOfWeek = 1;
-                        break;
-                    case "Friday":
-                        dayOfWeek = 2;
-                        break;
-                    case "Saturday":
-                        dayOfWeek = 3;
-                        break;
-                    case "Sunday":
-                        dayOfWeek = 4;
-                        break;
-                    case "Monday":
-                        dayOfWeek = 5;
-                        break;
-                    default:
-                        dayOfWeek = 0;
-                        break;
-                }
-                Log("---Generating 24 entries for DailySalesId = " + DSid);
-                for (int i = 1; i <= 24; i++)
-                {
-                    DailySalesEntry dse = new DailySalesEntry();
-                    dse.BudgetedManHours = 0;
-                    if (i >= 9)
-                    {
-
-                        Log("Generating Budgeted Man Hours for hour " + i);
-                        string paramText = "select Day" + dayOfWeek + " from projectionsideal where projectionsID = " + projectionID + " and hour = " + (i - 8);
-                        buffer = connection.ExecuteScalar(paramText);
-                        Log("Budgeted hours command: " + paramText);
-                        if (buffer != DBNull.Value && buffer != null && Convert.ToDouble(buffer) != 0)
-                        {
-                            Log("BudgetedManHours = " + Convert.ToDouble(buffer));
-                            dse.BudgetedManHours = Convert.ToDouble(buffer);
-                        }
-                    }
-                    dse.DailySalesId = DSid;
-                    dse.Hour = i;
-                    dse.Manager = "";
-                    dse.CustCount = 0;
-                    dse.DriveCustCount = 0;
-                    dse.HourlySales = 0;
-                    dse.CumulativeTotalSales = 0;
-                    dse.PullRegister1 = 0;
-                    dse.PullRegister2 = 0;
-                    dse.PullDrive = 0;
-                    dse.ActualManHours = 0;
-                    dse.GMLabor = 0.0;
-                    dse.CrewHrs = 0.0;
-
-                    Log("Executing 'dbo.addDailySalesEntry " + dse.DailySalesId + " " + dse.Hour + " " + dse.Manager + " " + dse.CustCount + " " + dse.DriveCustCount + " " + dse.HourlySales + " " + dse.CumulativeTotalSales +
-                            " " + dse.PullRegister1 + " " + dse.PullRegister2 + " " + dse.PullDrive + " " + dse.ActualManHours + " " + dse.BudgetedManHours + " " + dse.GMLabor + " " + dse.CrewHrs);
-                    connection.Execute("dbo.addDailySalesEntry @DailySalesId, @Hour, @Manager, @CustCount, @DriveCustCount, @HourlySales, @CumulativeTotalSales, @PullRegister1, @PullRegister2, @PullDrive, @ActualManHours, @BudgetedManHours, @DTOvers, @GMLabor, @CrewHrs", dse);
-
-                }
-                connection.Close();
+                projectionID = Convert.ToInt32(buffer);
             }
+
+            DayOfWeek dow = date.DayOfWeek;
+            int dayOfWeekOffset = Convert.ToInt16(ConfigurationManager.AppSettings.Get("dayOfWeekOffset"));
+            // Enum 
+            // mon - 1, tues - 2, wed - 3, thurs - 4, fri - 5, sat - 6, sun - 7
+            // curr
+            // mon - 4, tues - 5, wed - 6, thurs - 7, fri - 1, sat - 2, sun - 3
+            int dayInt = (int)((DayOfWeek)Enum.Parse(typeof(DayOfWeek), dow.ToString(), true));
+            int dayOfWeek = ( (dayInt - 1) + (dayOfWeekOffset - 1)) % 7 + 1;
+                
+            Log("---Generating 24 entries for DailySalesId = " + DSid);
+            for (int i = 1; i <= 24; i++)
+            {
+                DailySalesEntry dse = new DailySalesEntry();
+                dse.BudgetedManHours = 0;
+                if (i >= 9)
+                {
+
+                    Log("Generating Budgeted Man Hours for hour " + i);
+                    string paramText = "select Day" + dayOfWeek + " from projectionsideal where projectionsID = " + projectionID + " and hour = " + (i - 8);
+                    buffer = connection.ExecuteScalar(paramText);
+                    Log("Budgeted hours command: " + paramText);
+                    if (buffer != DBNull.Value && buffer != null && Convert.ToDouble(buffer) != 0)
+                    {
+                        Log("BudgetedManHours = " + Convert.ToDouble(buffer));
+                        dse.BudgetedManHours = Convert.ToDouble(buffer);
+                    }
+                }
+                dse.DailySalesId = DSid;
+                dse.Hour = i;
+                dse.Manager = "";
+                dse.CustCount = 0;
+                dse.DriveCustCount = 0;
+                dse.HourlySales = 0;
+                dse.CumulativeTotalSales = 0;
+                dse.PullRegister1 = 0;
+                dse.PullRegister2 = 0;
+                dse.PullDrive = 0;
+                dse.ActualManHours = 0;
+                dse.GMLabor = 0.0;
+                dse.CrewHrs = 0.0;
+
+                Log("Executing 'dbo.addDailySalesEntry " + dse.DailySalesId + " " + dse.Hour + " " + dse.Manager + " " + dse.CustCount + " " + dse.DriveCustCount + " " + dse.HourlySales + " " + dse.CumulativeTotalSales +
+                        " " + dse.PullRegister1 + " " + dse.PullRegister2 + " " + dse.PullDrive + " " + dse.ActualManHours + " " + dse.BudgetedManHours + " " + dse.GMLabor + " " + dse.CrewHrs);
+                connection.Execute("dbo.addDailySalesEntry @DailySalesId, @Hour, @Manager, @CustCount, @DriveCustCount, @HourlySales, @CumulativeTotalSales, @PullRegister1, @PullRegister2, @PullDrive, @ActualManHours, @BudgetedManHours, @DTOvers, @GMLabor, @CrewHrs", dse);
+
+            }
+
             Log("Generating 24 Entries complete.");
         }
-        public static void DSIdGenerator(int storeId, string store, DateTime date)
+        public static void DSIdGenerator(IDbConnection connection, int storeId, string store, DateTime date)
         {
             Log("Generating DSId starting...");
             Log("Hour = " + DateTime.Now.Hour + ", DailysSalesId checking triggered");
@@ -537,63 +512,56 @@ namespace AutoHourlySales
 
             try
             {
-                using (IDbConnection connection = new System.Data.SqlClient.SqlConnection(target))
+                Log("---Connection success = " + (connection.State == ConnectionState.Open));
+
+                /*
+                * Step 1: Check if entry already exists for date
+                */
+                Log("---Checking if ID exists for " + date);
+
+                Log("Executing 'dbo.getDailySalesId " + date.ToString("yyyy-MM-dd") + " " + storeId + "'");
+                object buffer = connection.Query<int>("dbo.getDailySalesId @Date, @StoreId", new { Date = date, StoreId = storeId }).FirstOrDefault();
+                if (buffer != null && buffer != DBNull.Value && (int)buffer != 0)
                 {
-                    Log("Connecting to target to check for DailySalesId");
+                    Log("---ID already exists for date, ID = " + (int)buffer);
+                    Log("--> " + (int)buffer);
+                    Log("Generating DSid complete");
+                }
 
-                    connection.Open();
-                    Log("---Connection success = " + (connection.State == ConnectionState.Open));
 
-                    /*
-                    * Step 1: Check if entry already exists for date
+                /*
+                    * Step 2: Generate new packet
                     */
-                    Log("---Checking if ID exists for " + date);
+                else
+                {
+                    Log("--> null");
+                    Log("---Previous ID not found, creating new ID");
+                    var _date = new DateTime(date.Year, date.Month, date.Day, 0, 0, 0);
+                    DailySales dailySales = new DailySales(_date);
+                    dailySales.ManagerId = 0;
+                    dailySales.Manager = "";
 
-                    Log("Executing 'dbo.getDailySalesId " + date.ToString("yyyy-MM-dd") + " " + storeId + "'");
-                    object buffer = connection.Query<int>("dbo.getDailySalesId @Date, @StoreId", new { Date = date, StoreId = storeId }).FirstOrDefault();
-                    if (buffer != null && buffer != DBNull.Value && (int)buffer != 0)
-                    {
-                        Log("---ID already exists for date, ID = " + (int)buffer);
-                        Log("--> " + (int)buffer);
-                        Log("Generating DSid complete");
+                    Log("Creating new DailySalesId");
+                    Log("DailySalesDate    | StoreId | Store | BaseForDay | ProjectionForDay | SubmitDate");
+                    Log(dailySales.DailySalesDate + " " + dailySales.StoreId + " " + dailySales.Store +
+                                        " " + dailySales.BaseForDay + " " + dailySales.ProjectionForDay + " " + dailySales.SubmitDate);
+
+                    Log("Executing 'dbo.addDailySales " + dailySales.DailySalesDate + " " + dailySales.StoreId + " " + dailySales.Store + " " + dailySales.ManagerId + " " + dailySales.Manager + " "
+                            + dailySales.BaseForDay + " " + dailySales.ProjectionForDay + " " + dailySales.SubmitDate);
+                    connection.Execute("dbo.addDailySales @DailySalesDate, @StoreId, @Store, @ManagerId, @Manager, @BaseForDay, @ProjectionForDay, @SubmitDate", dailySales);
+
+                    Log("Generating DSid complete");
+                    Log("DailySalesId Generated");
+
+                    //Check to make sure the day is clear before calling 24 hour generator
+                    buffer = connection.Query<int>("dbo.getDailySalesId @Date, @StoreId", new { Date = date, StoreId = storeId }).FirstOrDefault();
+                    object buf2 = connection.ExecuteScalar("select count(*) from DailySalesEntry where DailySalesId = " + (int)buffer);
+                    if (buf2 != null && buf2 != DBNull.Value && (int)buf2 == 0)
+                    {                            
+                        Generate24Entries(connection, storeId, store);
                     }
 
 
-                    /*
-                     * Step 2: Generate new packet
-                     */
-                    else
-                    {
-                        Log("--> null");
-                        Log("---Previous ID not found, creating new ID");
-                        var _date = new DateTime(date.Year, date.Month, date.Day, 0, 0, 0);
-                        DailySales dailySales = new DailySales(_date);
-                        dailySales.ManagerId = 0;
-                        dailySales.Manager = "";
-
-                        Log("Creating new DailySalesId");
-                        Log("DailySalesDate    | StoreId | Store | BaseForDay | ProjectionForDay | SubmitDate");
-                        Log(dailySales.DailySalesDate + " " + dailySales.StoreId + " " + dailySales.Store +
-                                            " " + dailySales.BaseForDay + " " + dailySales.ProjectionForDay + " " + dailySales.SubmitDate);
-
-                        Log("Executing 'dbo.addDailySales " + dailySales.DailySalesDate + " " + dailySales.StoreId + " " + dailySales.Store + " " + dailySales.ManagerId + " " + dailySales.Manager + " "
-                               + dailySales.BaseForDay + " " + dailySales.ProjectionForDay + " " + dailySales.SubmitDate);
-                        connection.Execute("dbo.addDailySales @DailySalesDate, @StoreId, @Store, @ManagerId, @Manager, @BaseForDay, @ProjectionForDay, @SubmitDate", dailySales);
-
-                        Log("Generating DSid complete");
-                        Log("DailySalesId Generated");
-
-                        //Check to make sure the day is clear before calling 24 hour generator
-                        buffer = connection.Query<int>("dbo.getDailySalesId @Date, @StoreId", new { Date = date, StoreId = storeId }).FirstOrDefault();
-                        object buf2 = connection.ExecuteScalar("select count(*) from DailySalesEntry where DailySalesId = " + (int)buffer);
-                        if (buf2 != null && buf2 != DBNull.Value && (int)buf2 == 0)
-                        {                            
-                            Generate24Entries(storeId, store);
-                        }
-
-
-                    }
-                    connection.Close();
                 }
             } catch (Exception e)
             {
@@ -603,7 +571,7 @@ namespace AutoHourlySales
             }
             
         }
-        public static int getDailySalesId(DateTime date, int StoreId, string Store)
+        public static int getDailySalesId(IDbConnection connection, DateTime date, int StoreId, string Store)
         {
 
             /*
@@ -613,22 +581,16 @@ namespace AutoHourlySales
             Log("Getting DailySaleId for date = " + date + " { ");
             int DailySalesId = 0;
             Log("Establishing connection to: " + target);
-            using (IDbConnection connection = new System.Data.SqlClient.SqlConnection(target))
-            {
-                Log("Connecting to target to check for DailySalesId");
 
-                connection.Open();
-                Log("---Connection state = " + (connection.State == ConnectionState.Open));
-                Log("---Connection success = " + (connection.State == ConnectionState.Open));
+            Log("---Connection state = " + (connection.State == ConnectionState.Open));
+            Log("---Connection success = " + (connection.State == ConnectionState.Open));
 
 
-                DateTime queryDate = new DateTime(date.Year, date.Month, date.Day);
+            DateTime queryDate = new DateTime(date.Year, date.Month, date.Day);
                                 
-                DailySalesId = connection.Query<int>("dbo.getDailySalesId @DailySalesDate, @StoreId", new { DailySalesDate = queryDate, StoreId = StoreId, Store = Store}).FirstOrDefault();
-                Log("---Fetched ID = " + DailySalesId);
+            DailySalesId = connection.Query<int>("dbo.getDailySalesId @DailySalesDate, @StoreId", new { DailySalesDate = queryDate, StoreId = StoreId, Store = Store}).FirstOrDefault();
+            Log("---Fetched ID = " + DailySalesId);
 
-                connection.Close();
-            }
 
             Log("Getting DailySaleId for date = " + date + " complete");
 

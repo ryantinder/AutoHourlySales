@@ -443,8 +443,8 @@ namespace AutoHourlySales
             int DSid = getDailySalesId(connection, new DateTime(date.Year, date.Month, date.Day), storeId, store);
 
             int projectionID = 0;
-            int fiscalYear = (date.Month == 12) ? date.Year + 1 : date.Year;
-            TimeSpan tDiff = new DateTime(fiscalYear - 1, 12, 1) - date;
+            int fiscalYear = date.Year;
+            TimeSpan tDiff = new DateTime(fiscalYear, 1, 1) - date;
             int week = Math.Abs(tDiff.Days / 7) + 1;
             string cmdText = "select ID from projections where FiscalYear = " + fiscalYear + " and week = " + week + " and storeid = " + storeId;
             object buffer = connection.ExecuteScalar(cmdText);

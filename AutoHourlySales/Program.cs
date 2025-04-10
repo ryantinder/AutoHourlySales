@@ -468,10 +468,24 @@ namespace AutoHourlySales
             {
                 DailySalesEntry dse = new DailySalesEntry();
                 dse.BudgetedManHours = 0;
+                if (i <= 2)
+                {
+                    Log("Generating Budgeted Man Hours for hour " + i);
+                    // in the projectionsideal table, hour 1 == 9am
+                    string paramText = "select Day" + dayOfWeek + " from projectionsideal where projectionsID = " + projectionID + " and hour = " + (i + 16);
+                    buffer = connection.ExecuteScalar(paramText);
+                    Log("Budgeted hours command: " + paramText);
+                    if (buffer != DBNull.Value && buffer != null && Convert.ToDouble(buffer) != 0)
+                    {
+                        Log("BudgetedManHours = " + Convert.ToDouble(buffer));
+                        dse.BudgetedManHours = Convert.ToDouble(buffer);
+                    }
+                }
                 if (i >= 9)
                 {
 
                     Log("Generating Budgeted Man Hours for hour " + i);
+                    // in the projectionsideal table, hour 1 == 9am
                     string paramText = "select Day" + dayOfWeek + " from projectionsideal where projectionsID = " + projectionID + " and hour = " + (i - 8);
                     buffer = connection.ExecuteScalar(paramText);
                     Log("Budgeted hours command: " + paramText);

@@ -48,5 +48,4 @@ jobs:
       with:
         name: build-output
         path: |
-          bin/Release/
-          !bin/Release/*.pdb
+          AutoHourlySales/bin/Release/AutoHourlySales.exe

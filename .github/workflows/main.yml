@@ -1,0 +1,52 @@
+name: .NET Framework Build
+
+# Controls when the workflow will run
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+# A workflow run is made up of one or more jobs
+jobs:
+  build:
+    # Use Windows since .NET Framework is Windows-specific
+    runs-on: windows-2019
+    
+    steps:
+    # Checkout the repository code
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    # Setup MSBuild
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1.1
+      
+    # Setup NuGet
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v1
+      
+    # Restore NuGet packages
+    - name: Restore NuGet packages
+      run: nuget restore AutoHourlySales.sln
+      
+    # Build the solution
+    - name: Build the solution
+      run: msbuild AutoHourlySales.sln /p:Configuration=Release /p:Platform="Any CPU"
+      
+    # Optional: Run tests if you have a test project
+    # Uncomment and adjust the following steps if needed
+    #- name: Setup VSTest
+    #  uses: darenm/Setup-VSTest@v1
+    #
+    #- name: Run Tests
+    #  run: vstest.console.exe "path/to/your/test.dll" /Platform:x64
+      
+    # Optional: Create artifacts
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-output
+        path: |
+          bin/Release/
+          !bin/Release/*.pdb
